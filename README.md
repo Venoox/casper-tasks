@@ -381,3 +381,424 @@ casper-client query-state --node-address http://localhost:11101 \
     --key 3f833226f4af3323c2c0934190f680e7506604355d01287d252af90d84e1e077 -q "counter/count"
 ```
 ![15](https://user-images.githubusercontent.com/21956707/134149113-b7e31a2e-1172-4725-9b3f-b761008a5a5f.png)
+
+
+# 3. Key management and implementing Scenario 3
+
+First I cloned keys-manager: `git clone https://github.com/casper-ecosystem/keys-manager`
+and build it: `cargo build --release`
+
+The modify client's env file to:
+```
+BASE_KEY_PATH=/home/venoox/casper/casper-node/utils/nctl/assets/net-1/faucet/
+NODE_URL=http://localhost:11101/rpc
+```
+I copied scenario-all.js and modified to fit scenario 3:
+
+```js
+const keyManager = require('./key-manager');
+const TRANSFER_AMOUNT = process.env.TRANSFER_AMOUNT || 2500000000;
+
+(async function () {
+
+    // Scenario 3
+    
+    // To achive the task, we will:
+    // 1. Set Keys Management Threshold to 2.
+    // 2. Set Deploy Threshold to 1.
+    // 3. Set both accounts to 1.
+    // 4. Add a new key using mainAccount and firstAccount.
+    // 5. Remove newly added key using mainAccount and firstAccount.
+
+    const masterKey = keyManager.randomMasterKey();
+    const mainAccount = masterKey.deriveIndex(1);
+    const firstAccount = masterKey.deriveIndex(2);
+    const secondAccount = masterKey.deriveIndex(3);
+
+    console.log("Main account: " + mainAccount.publicKey.toHex());
+    console.log("First account: " + firstAccount.publicKey.toHex());
+
+    console.log("\n[x] Funding main account.");
+    await keyManager.fundAccount(mainAccount);
+    await keyManager.printAccount(mainAccount);
+
+    console.log("\n[x] Install Keys Manager contract");
+    let deploy = keyManager.keys.buildContractInstallDeploy(mainAccount);
+    await keyManager.sendDeploy(deploy, [mainAccount]);
+    await keyManager.printAccount(mainAccount);
+
+    // Deploy threshold is 1
+    const deployThereshold = 1;
+    // Key Managment threshold is 2
+    const keyManagementThreshold = 2;
+
+    const accounts = [
+        { publicKey: mainAccount.publicKey, weight: 1 },
+        { publicKey: firstAccount.publicKey, weight: 1 },
+    ];
+
+    console.log("\n[x] Update keys deploy.");
+    deploy = keyManager.keys.setAll(mainAccount, deployThereshold, keyManagementThreshold, accounts);
+    await keyManager.sendDeploy(deploy, [mainAccount]);
+    await keyManager.printAccount(mainAccount);
+
+    console.log("\n[x] Add a new key with weight 1.\n");
+    deploy = keyManager.keys.setKeyWeightDeploy(mainAccount, secondAccount, 1);
+    await keyManager.sendDeploy(deploy, [mainAccount, firstAccount]);
+    await keyManager.printAccount(mainAccount);
+
+    console.log("\n[x] Remove a newly added key.\n");
+    deploy = keyManager.keys.setKeyWeightDeploy(mainAccount, secondAccount, 0);
+    await keyManager.sendDeploy(deploy, [mainAccount, firstAccount]);
+    await keyManager.printAccount(mainAccount);
+
+})();
+```
+
+Result:
+```
+[venoox@venoox-pc client]$ npm run start:three
+
+> keys-manager@1.0.0 start:three
+> node -r dotenv/config ./src/scenario-3.js
+
+Main account: 0202bd02b9af3994ecb8a8a22c970e647b1575093be14b46866d19803c451ca02322
+First account: 0202a2b6a2e27783f2be219599749ceed32ad69bd35166c89586b7b229e96790ded2
+
+[x] Funding main account.
+Signed by: account-hash-3ff899ca5992454a83050876e1419632179a824b4c98f71a96a1684d946944a2
+Deploy hash: 915d829211b476fa6f5dcd953232c2f5b2cc43ccff3d20e744ccb11d35890793
+Deploy result:
+{
+  deploy: {
+    hash: '915d829211b476fa6f5dcd953232c2f5b2cc43ccff3d20e744ccb11d35890793',
+    header: {
+      account: '013c78e3b26a7a8dbdd621d92d15957068b12cac141d1c5048ed84087ab5404333',
+      timestamp: '2021-09-21T13:37:43.188Z',
+      ttl: '30m',
+      gas_price: 1,
+      body_hash: '32048456c13834161104e77754508a8785ccd922842b946c5a470a53827db082',
+      dependencies: [],
+      chain_name: 'casper-net-1'
+    },
+    payment: { ModuleBytes: [Object] },
+    session: { Transfer: [Object] },
+    approvals: [ [Object] ]
+  }
+}
+
+[x] Current state of the account:
+{
+  _accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+  namedKeys: [],
+  mainPurse: 'uref-189b85eba2db16ed784da6e46b6dce6729008d5c8feceec26a69c83c71151e9f-007',
+  associatedKeys: [
+    {
+      accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+      weight: 1
+    }
+  ],
+  actionThresholds: { deployment: 1, keyManagement: 1 }
+}
+
+[x] Install Keys Manager contract
+Signed by: account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652
+Deploy hash: a7ab75039441ac58d48423f8eebabae95f5121bbbd6b541a4976905c67fb0cf7
+Deploy result:
+{
+  deploy: {
+    hash: 'a7ab75039441ac58d48423f8eebabae95f5121bbbd6b541a4976905c67fb0cf7',
+    header: {
+      account: '0202bd02b9af3994ecb8a8a22c970e647b1575093be14b46866d19803c451ca02322',
+      timestamp: '2021-09-21T13:38:49.664Z',
+      ttl: '30m',
+      gas_price: 1,
+      body_hash: 'c348c29f842d188fdcd24766b1bb3fbb017478bfa792590a688c63c72303c5b7',
+      dependencies: [],
+      chain_name: 'casper-net-1'
+    },
+    payment: { ModuleBytes: [Object] },
+    session: { ModuleBytes: [Object] },
+    approvals: [ [Object] ]
+  }
+}
+
+[x] Current state of the account:
+{
+  _accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+  namedKeys: [
+    {
+      name: 'keys_manager',
+      key: 'hash-6b62145ee181ffbd871c9fcd96098be14a026fa316e55aca44efbfe01f550cd9'
+    },
+    {
+      name: 'keys_manager_hash',
+      key: 'uref-0cbe70f0eabb43c27d6fd29501bcd53976a9fdb2c3b13e6712fe2e2a804fd686-007'
+    }
+  ],
+  mainPurse: 'uref-189b85eba2db16ed784da6e46b6dce6729008d5c8feceec26a69c83c71151e9f-007',
+  associatedKeys: [
+    {
+      accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+      weight: 1
+    }
+  ],
+  actionThresholds: { deployment: 1, keyManagement: 1 }
+}
+
+[x] Update keys deploy.
+Signed by: account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652
+Deploy hash: 318782ee53fe69abafb2c50e3541962e2e3cd24bfba90c7d41ad15e931de6c11
+Deploy result:
+{
+  deploy: {
+    hash: '318782ee53fe69abafb2c50e3541962e2e3cd24bfba90c7d41ad15e931de6c11',
+    header: {
+      account: '0202bd02b9af3994ecb8a8a22c970e647b1575093be14b46866d19803c451ca02322',
+      timestamp: '2021-09-21T13:39:55.009Z',
+      ttl: '30m',
+      gas_price: 1,
+      body_hash: '5e0f62f527f3785003762fa540f99bc403a3d0ac3f02fb9902867f1434de6d3a',
+      dependencies: [],
+      chain_name: 'casper-net-1'
+    },
+    payment: { ModuleBytes: [Object] },
+    session: { StoredContractByName: [Object] },
+    approvals: [ [Object] ]
+  }
+}
+
+[x] Current state of the account:
+{
+  _accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+  namedKeys: [
+    {
+      name: 'keys_manager',
+      key: 'hash-6b62145ee181ffbd871c9fcd96098be14a026fa316e55aca44efbfe01f550cd9'
+    },
+    {
+      name: 'keys_manager_hash',
+      key: 'uref-0cbe70f0eabb43c27d6fd29501bcd53976a9fdb2c3b13e6712fe2e2a804fd686-007'
+    }
+  ],
+  mainPurse: 'uref-189b85eba2db16ed784da6e46b6dce6729008d5c8feceec26a69c83c71151e9f-007',
+  associatedKeys: [
+    {
+      accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+      weight: 1
+    },
+    {
+      accountHash: 'account-hash-2eac8a900a6ad91927a290a0155aee13529862b4f08289ea5245a9467ec64f67',
+      weight: 1
+    }
+  ],
+  actionThresholds: { deployment: 1, keyManagement: 2 }
+}
+
+[x] Add a new key with weight 1.
+
+Signed by: account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652
+Signed by: account-hash-2eac8a900a6ad91927a290a0155aee13529862b4f08289ea5245a9467ec64f67
+Deploy hash: fd493b16397fecd4ff2cf79cd53151c1e3393f6f16334239daf09872fbeb5b9d
+Deploy result:
+{
+  deploy: {
+    hash: 'fd493b16397fecd4ff2cf79cd53151c1e3393f6f16334239daf09872fbeb5b9d',
+    header: {
+      account: '0202bd02b9af3994ecb8a8a22c970e647b1575093be14b46866d19803c451ca02322',
+      timestamp: '2021-09-21T13:41:00.600Z',
+      ttl: '30m',
+      gas_price: 1,
+      body_hash: '279cd0865be0838000e240c95d481bede0b0286f0ea9776a45542beeb3a2eddf',
+      dependencies: [],
+      chain_name: 'casper-net-1'
+    },
+    payment: { ModuleBytes: [Object] },
+    session: { StoredContractByName: [Object] },
+    approvals: [ [Object], [Object] ]
+  }
+}
+
+[x] Current state of the account:
+{
+  _accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+  namedKeys: [
+    {
+      name: 'keys_manager',
+      key: 'hash-6b62145ee181ffbd871c9fcd96098be14a026fa316e55aca44efbfe01f550cd9'
+    },
+    {
+      name: 'keys_manager_hash',
+      key: 'uref-0cbe70f0eabb43c27d6fd29501bcd53976a9fdb2c3b13e6712fe2e2a804fd686-007'
+    }
+  ],
+  mainPurse: 'uref-189b85eba2db16ed784da6e46b6dce6729008d5c8feceec26a69c83c71151e9f-007',
+  associatedKeys: [
+    {
+      accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+      weight: 1
+    },
+    {
+      accountHash: 'account-hash-2eac8a900a6ad91927a290a0155aee13529862b4f08289ea5245a9467ec64f67',
+      weight: 1
+    },
+    {
+      accountHash: 'account-hash-d3433951324df5b29e2f8a68e7513ccf9f2badace9d33dc32b814fe768865ead',
+      weight: 1
+    }
+  ],
+  actionThresholds: { deployment: 1, keyManagement: 2 }
+}
+
+[x] Remove a newly added key.
+
+Signed by: account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652
+Signed by: account-hash-2eac8a900a6ad91927a290a0155aee13529862b4f08289ea5245a9467ec64f67
+Deploy hash: 3db5921bc2f8e0fe3deec896234f9ae17d75d7b6c4142015bdef28b2f1f11620
+Deploy result:
+{
+  deploy: {
+    hash: '3db5921bc2f8e0fe3deec896234f9ae17d75d7b6c4142015bdef28b2f1f11620',
+    header: {
+      account: '0202bd02b9af3994ecb8a8a22c970e647b1575093be14b46866d19803c451ca02322',
+      timestamp: '2021-09-21T13:42:06.881Z',
+      ttl: '30m',
+      gas_price: 1,
+      body_hash: 'a265fdf14dbd12873193564adb390a63e7a0a5b5d3b051013e926dfa61c21e48',
+      dependencies: [],
+      chain_name: 'casper-net-1'
+    },
+    payment: { ModuleBytes: [Object] },
+    session: { StoredContractByName: [Object] },
+    approvals: [ [Object], [Object] ]
+  }
+}
+
+[x] Current state of the account:
+{
+  _accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+  namedKeys: [
+    {
+      name: 'keys_manager',
+      key: 'hash-6b62145ee181ffbd871c9fcd96098be14a026fa316e55aca44efbfe01f550cd9'
+    },
+    {
+      name: 'keys_manager_hash',
+      key: 'uref-0cbe70f0eabb43c27d6fd29501bcd53976a9fdb2c3b13e6712fe2e2a804fd686-007'
+    }
+  ],
+  mainPurse: 'uref-189b85eba2db16ed784da6e46b6dce6729008d5c8feceec26a69c83c71151e9f-007',
+  associatedKeys: [
+    {
+      accountHash: 'account-hash-0156c023445ae7953cb1af84505aeed32048c48477626c051f2f3a66378e7652',
+      weight: 1
+    },
+    {
+      accountHash: 'account-hash-2eac8a900a6ad91927a290a0155aee13529862b4f08289ea5245a9467ec64f67',
+      weight: 1
+    }
+  ],
+  actionThresholds: { deployment: 1, keyManagement: 2 }
+}
+```
+
+# 4. Transfer tokens to an account on the Casper Testnet.
+
+```
+casper-client transfer \
+    --id 1 \
+    --transfer-id 123456789012345 \
+    --node-address http://157.230.49.238:7777 \
+    --amount 2500000000 \
+    --payment-amount 15000 \
+    --secret-key ~/.casper-keys/secret_key.pem \
+    --chain-name casper-test \
+    --target-account 0172a54c123b336fb1d386bbdff450623d1b5da904f5e2523b3e347b6d7573ae80
+```
+![16](https://user-images.githubusercontent.com/21956707/134186317-00b30421-c876-4516-b5fb-56cfa762cbdf.png)
+
+Deployed hash: `9ea2fec7b41a829638c8917bc3fe7134a76469596c6a42561b26182e6f484973`
+
+Query deploy:
+```
+casper-client get-deploy \
+      --id 2 \
+      --node-address http://157.230.49.238:7777 \
+     9ea2fec7b41a829638c8917bc3fe7134a76469596c6a42561b26182e6f484973
+```
+
+"result"."execution_results"[0]."transfers[0]": `transfer-e7ecec5d29c5045399bb93fa1a5868cd7fdacdb05f889a20a54f10d2eddba56f`
+
+"result"."execution_results"[0]."block_hash": `9c32ac5bca7034192f6de6f10085de9be58edda9cb0dccf8b50a758c921e3f62`
+
+Get state root hash:
+```
+casper-client get-block \
+      --id 3 \
+      --node-address http://157.230.49.238:7777 \
+      --block-identifier 9c32ac5bca7034192f6de6f10085de9be58edda9cb0dccf8b50a758c921e3f62
+```
+
+"result"."block"."header"."state_root_hash": `a61579b22164a919212a65d5866110e741db9a7c13aa22339e6eeccc06b14ef6`
+
+Query the Source Account:
+```
+casper-client query-state \
+  --id 4 \
+  --node-address http://157.230.49.238:7777 \
+  --state-root-hash a61579b22164a919212a65d5866110e741db9a7c13aa22339e6eeccc06b14ef6 \
+  --key 01e456c3779510fd14e83fa3be84ff4b2a22de76ef6be677ed7936f37f7712a0a4
+```
+
+"result"."stored_value"."Account"."main_purse": `uref-904bf9e4268486082d950c06ffcb5ff684b3d4547d8199a819248d1ab3f18c86-007`
+
+Query the Target Account:
+```
+casper-client query-state \
+      --id 5 \
+      --node-address http://157.230.49.238:7777 \
+      --state-root-hash a61579b22164a919212a65d5866110e741db9a7c13aa22339e6eeccc06b14ef6 \
+      --key 0172a54c123b336fb1d386bbdff450623d1b5da904f5e2523b3e347b6d7573ae80
+```
+
+"result"."stored_value"."Account"."main_purse": `uref-e7ecec5d29c5045399bb93fa1a5868cd7fdacdb05f889a20a54f10d2eddba56f-007`
+
+Get Source Account Balance:
+```
+casper-client get-balance \
+      --id 6 \
+      --node-address http://157.230.49.238:7777 \
+      --state-root-hash a61579b22164a919212a65d5866110e741db9a7c13aa22339e6eeccc06b14ef6 \
+      --purse-uref uref-904bf9e4268486082d950c06ffcb5ff684b3d4547d8199a819248d1ab3f18c86-007
+```
+```
+{
+  "id": 6,
+  "jsonrpc": "2.0",
+  "result": {
+    "api_version": "1.3.2",
+    "balance_value": "997489990000",
+    "merkle_proof": "[19786 hex chars]"
+  }
+}
+```
+
+Get Target Account Balance:
+```
+casper-client get-balance \
+      --id 7 \
+      --node-address http://157.230.49.238:7777 \
+      --state-root-hash a61579b22164a919212a65d5866110e741db9a7c13aa22339e6eeccc06b14ef6 \
+      --purse-uref uref-e7ecec5d29c5045399bb93fa1a5868cd7fdacdb05f889a20a54f10d2eddba56f-007
+```
+```
+{
+  "id": 7,
+  "jsonrpc": "2.0",
+  "result": {
+    "api_version": "1.3.2",
+    "balance_value": "2500000000",
+    "merkle_proof": "[20124 hex chars]"
+  }
+}
+```
