@@ -455,7 +455,7 @@ const TRANSFER_AMOUNT = process.env.TRANSFER_AMOUNT || 2500000000;
 })();
 ```
 
-Result:
+Console output:
 ```
 [venoox@venoox-pc client]$ npm run start:three
 
@@ -802,3 +802,22 @@ casper-client get-balance \
   }
 }
 ```
+
+# 5. Delegate and Undelegate on the Casper Testnet
+
+Account public hex-encoded key: `01e456c3779510fd14e83fa3be84ff4b2a22de76ef6be677ed7936f37f7712a0a4`
+
+Validator: `017d96b9a63abcb61c870a4f55187a0a7ac24096bdb5fc585c12a686a4d892009e`
+
+1. Delegate
+
+![18](https://user-images.githubusercontent.com/21956707/134193078-0f4862d7-1148-4497-9172-04f3e9ccfd66.png)
+![19](https://user-images.githubusercontent.com/21956707/134193096-d1fb69ba-61fc-406a-ab73-0df5ed4d3156.png)
+![20](https://user-images.githubusercontent.com/21956707/134193105-04b8eba5-601b-41d4-85d1-bf66384dd947.png)
+
+2. Undelegate
+
+![21](https://user-images.githubusercontent.com/21956707/134193182-a05975dc-f798-4df3-8470-e14eee90a0ba.png)
+![22](https://user-images.githubusercontent.com/21956707/134193189-2279402f-ec94-4a01-b075-1f22027f0d74.png)
+![23](https://user-images.githubusercontent.com/21956707/134193208-a87e921a-7698-4136-a7c7-e8dbdd538d8b.png)
+
